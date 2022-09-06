@@ -9,18 +9,19 @@
 #define AUTHOR "Suchorski"
 
 #define MAX_TB 1
-#define MAX_MB 2
-#define MAX_BR 3
+#define MAX_MB 1
+#define MAX_BR 1
+#define BONUS 10
+#define BONUS_LINE 3
 #define VAULT_NAME "PATENTES"
 
-new rankPoints[] 		= {  2000, 1500, 1000, 500,  400,  350,  300,  250,  200,  150,  100,   80,   50,   25,    10,    1,    0 };
-new rankAbbreviations[][3] 	= { "TB", "MB", "BR", "CL", "TC", "MJ", "CP", "1T", "2T", "SO", "1S", "2S", "3S", "CB", "S1", "S2", "RC" };
+new rankPoints[] 		= {  1000, 900,  800,  500,   450, 400,  350,  300,  250,   150,  100,  50,   25,   10,    1,    0 };
+new rankAbbreviations[][3] 	= { "TB", "MB", "BR", "CL", "TC", "MJ", "CP", "1T", "2T", "SO", "1S", "2S", "3S", "CB", "S1", "S2" };
 new rankNames[][64]		= {
 	"Tenente Brigadeiro", 	"Major Brigadeiro", 	"Brigadeiro",			"Coronel",
 	"Tenente Coronel", 	"Major", 		"Capitao", 			"Primeiro Tenente",
 	"Segundo Tenente", 	"Suboficial", 		"Primeiro Sargento", 		"Segundo Sargento",
-	"Terceiro Sargento", 	"Cabo", 		"Soldado de Primeira Classe", 	"Soldado de Segunda Classe",
-	"Recruta"
+	"Terceiro Sargento", 	"Cabo", 		"Soldado de Primeira Classe", 	"Soldado de Segunda Classe"
 };
 
 new bool:loaded, vault;
@@ -40,10 +41,16 @@ public plugin_init() {
 
 public handleRank(victim, attacker) {
 	if (loaded) {
-		new playerName[64], points, save[16];
+		new playerName[64], points, save[16], vRankIndex, aRankIndex;
+		get_user_name(victim, playerName, 63);
+		vRankIndex = getRankIndex(nvault_get(vault, playerName));
 		get_user_name(attacker, playerName, 63);
 		points = nvault_get(vault, playerName);
+		aRankIndex = getRankIndex(points);
 		points += 3;
+		if (vRankIndex < BONUS_LINE && aRankIndex >= BONUS_LINE) {
+			points += 7;
+		}
 		num_to_str(points, save, 15);
 		nvault_set(vault, playerName, save);
 		get_user_name(victim, playerName, 63);
