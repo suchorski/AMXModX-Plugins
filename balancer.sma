@@ -10,7 +10,7 @@ new amxBalancer;
 
 public plugin_init() {
 	register_plugin(PLUGIN, VERSION, AUTHOR)
-	amxBalancer = register_cvar("amx_balancer","1");
+	amxBalancer = register_cvar("amx_balancer","0");
 	RegisterHam(Ham_TakeDamage, "player", "takeDamage");
 }
 
