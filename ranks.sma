@@ -171,7 +171,7 @@ genRank(status[32][3], playersCount, message[1501]) {
 	strcat(message, "ANTIGUIDADE^n", 1500);
 	for (new i = 0; i < playersCount; ++i) {
 		get_user_name(status[i][0], name, 32);
-		format(append, 100, "^t^t%s %s^n", rankAbbreviations[status[i][2]], name);
+		format(append, 100, "^t^t%s %s^t^t^t[%d]^n", rankAbbreviations[status[i][2]], name, status[i][1]);
 		strcat(message, append, 1500);
 	}
 	return message;
