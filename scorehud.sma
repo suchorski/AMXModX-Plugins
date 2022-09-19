@@ -32,9 +32,9 @@ public mm(num) {
 }
 
 public sorter(left[3], right[3]) {
-	new positive = mm((right[1] - right[2]) - (left[1] - left[2]));
-	if (positive != 0) {
-		return positive;
+	new leftPositive = mm(left[1] - left[2]), rightPositive = mm(right[1] - right[2]);
+	if (leftPositive != rightPositive) {
+		return leftPositive > rightPositive ? -1 : 1;
 	}
 	new frags = mm(right[1] - left[1]);
 	if (frags != 0) {
