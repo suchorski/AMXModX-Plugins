@@ -1,11 +1,10 @@
 #include <amxmodx>
 #include <amxmisc>
 #include <nvault>
-#include <hamsandwich>
 #include <sorting>
 
 #define PLUGIN "Patentes da Aeronautica"
-#define VERSION "1.0"
+#define VERSION "1.1"
 #define AUTHOR "Suchorski"
 
 #define MAX_TB 1
@@ -34,22 +33,36 @@ public plugin_init() {
 		register_clcmd("amx_ranking_set", "set", ADMIN_LEVEL_A, "<target> <points>");
 		register_clcmd("amx_ranking_del", "del", ADMIN_LEVEL_A, "<target>");
 		register_clcmd("say /patente", "get", -1, "<target>");
-		RegisterHam(Ham_Killed, "player", "handleRank");
+		register_event("DeathMsg", "handleKill", "a");
 		set_task(0.5, "updateHud", 0, "", 0, "b");
 	}
 }
 
-public handleRank(victim, attacker) {
-	if (loaded) {
-		new playerName[64], points, save[16], vRankIndex, aRankIndex;
+public handleKill() {
+	new attacker = read_data(1), victim = read_data(2), hs = read_data(3), inflictor[33], playerName[64], points, save[16];
+	if (!is_user_connected(attacker) || attacker == victim) {
+		get_user_name(victim, playerName, 63);
+		points = nvault_get(vault, playerName);
+		points = max(0, points - 20);
+		num_to_str(points, save, 15);
+		nvault_set(vault, playerName, save);
+	} else {
+		new vRankIndex, aRankIndex;
+		read_data(4, inflictor, 32);
 		get_user_name(victim, playerName, 63);
 		vRankIndex = getRankIndex(nvault_get(vault, playerName));
 		get_user_name(attacker, playerName, 63);
 		points = nvault_get(vault, playerName);
 		aRankIndex = getRankIndex(points);
 		points += 3;
+		if (hs) {
+			points += 1;
+		}
 		if (vRankIndex < BONUS_LINE && aRankIndex >= BONUS_LINE) {
-			points += 7;
+			points += 6;
+		}
+		if (!strcmp("knife", inflictor)) {
+			points += 10;
 		}
 		num_to_str(points, save, 15);
 		nvault_set(vault, playerName, save);
@@ -59,7 +72,6 @@ public handleRank(victim, attacker) {
 		num_to_str(points, save, 15);
 		nvault_set(vault, playerName, save);
 	}
-	return HAM_IGNORED;
 }
 
 public updateHud() {
