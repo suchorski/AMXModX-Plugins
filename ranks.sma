@@ -2,17 +2,24 @@
 #include <amxmisc>
 #include <nvault>
 #include <sorting>
+#include <fakemeta>
 
 #define PLUGIN "Patentes da Aeronautica"
-#define VERSION "1.1"
+#define VERSION "2.0"
 #define AUTHOR "Suchorski"
 
+#define write_coord_f(%1) engfunc(EngFunc_WriteCoord, %1)
+
+#define POINTS_ATTACKER 3
+#define BONUS_HS 2
+#define BONUS_KNIFE 10
+#define BONUS_GENERAL_LINE 3
+#define BONUS_GENERAL_KILL 5
 #define MAX_TB 1
 #define MAX_MB 1
 #define MAX_BR 1
-#define BONUS 10
-#define BONUS_LINE 3
 #define VAULT_NAME "PATENTES"
+#define POISON_SPRITE "sprites/skull.spr"
 
 new rankPoints[] 		= {  1000, 900,  800,  500,   450, 400,  350,  300,  250,   150,  100,  50,   25,   10,    1,    0 };
 new rankAbbreviations[][3] 	= { "TB", "MB", "BR", "CL", "TC", "MJ", "CP", "1T", "2T", "SO", "1S", "2S", "3S", "CB", "S1", "S2" };
@@ -23,19 +30,24 @@ new rankNames[][64]		= {
 	"Terceiro Sargento", 	"Cabo", 		"Soldado de Primeira Classe", 	"Soldado de Segunda Classe"
 };
 
-new bool:loaded, vault;
+new vault, poisonSprite;
 
 public plugin_init() {
 	register_plugin(PLUGIN, VERSION, AUTHOR);
 	vault = nvault_open(VAULT_NAME);
-	loaded = vault != INVALID_HANDLE;
-	if (loaded) {
+	if (vault == INVALID_HANDLE) {
+		set_fail_state("Unable to load vault");
+	} else {
 		register_clcmd("amx_ranking_set", "set", ADMIN_LEVEL_A, "<target> <points>");
 		register_clcmd("amx_ranking_del", "del", ADMIN_LEVEL_A, "<target>");
 		register_clcmd("say /patente", "get", -1, "<target>");
 		register_event("DeathMsg", "handleKill", "a");
 		set_task(0.5, "updateHud", 0, "", 0, "b");
 	}
+}
+
+public plugin_precache() {
+	poisonSprite = precache_model(POISON_SPRITE);
 }
 
 public handleKill() {
@@ -47,27 +59,27 @@ public handleKill() {
 		num_to_str(points, save, 15);
 		nvault_set(vault, playerName, save);
 	} else {
-		new vRankIndex, aRankIndex;
+		new status[32][3], playersCount = genStatus(status), aStatusIndex, vStatusIndex;
 		read_data(4, inflictor, 32);
-		get_user_name(victim, playerName, 63);
-		vRankIndex = getRankIndex(nvault_get(vault, playerName));
-		get_user_name(attacker, playerName, 63);
-		points = nvault_get(vault, playerName);
-		aRankIndex = getRankIndex(points);
-		points += 3;
+		aStatusIndex = getPlayerStatusIndex(status, playersCount, attacker);
+		vStatusIndex = getPlayerStatusIndex(status, playersCount, victim);
+		points = status[aStatusIndex][1];
+		points += POINTS_ATTACKER;
 		if (hs) {
-			points += 1;
+			points += BONUS_HS;
 		}
-		if (vRankIndex < BONUS_LINE && aRankIndex >= BONUS_LINE) {
-			points += 6;
+		if (status[vStatusIndex][2] < BONUS_GENERAL_LINE && status[aStatusIndex][2] >= BONUS_GENERAL_LINE) {
+			poisonEffect(victim);
+			points += BONUS_GENERAL_KILL;
 		}
 		if (!strcmp("knife", inflictor)) {
-			points += 10;
+			points += BONUS_KNIFE;
 		}
 		num_to_str(points, save, 15);
+		get_user_name(attacker, playerName, 63);
 		nvault_set(vault, playerName, save);
 		get_user_name(victim, playerName, 63);
-		points = nvault_get(vault, playerName);
+		points = status[vStatusIndex][1];
 		points = max(rankPoints[getRankIndex(points)], points - 1);
 		num_to_str(points, save, 15);
 		nvault_set(vault, playerName, save);
@@ -75,28 +87,7 @@ public handleKill() {
 }
 
 public updateHud() {
-	new players[32], playersCount, status[32][3], playerName[64], list[1501];
-	new points, tbCount = MAX_TB, mbCount = MAX_MB, brCount = MAX_BR;
-	get_players(players, playersCount);
-	for (new i = 0; i < playersCount; ++i) {
-		status[i][0] = players[i];
-		get_user_name(players[i], playerName, 63);
-		points = nvault_get(vault, playerName);
-		status[i][1] = points;
-		status[i][2] = getRankIndex(points);
-	}
-	SortCustom2D(status, playersCount, "sorter");
-	for (new i = 0; i < playersCount; ++i) {
-		if (status[i][2] == 0 && tbCount-- <= 0) {
-			status[i][2] = 1;
-		}
-		if (status[i][2] == 1 && mbCount-- <= 0) {
-			status[i][2] = 2;
-		}
-		if (status[i][2] == 2 && brCount-- <= 0) {
-			status[i][2] = 3;
-		}
-	}
+	new status[32][3], playersCount = genStatus(status), list[1501], playerName[64];
 	genRank(status, playersCount, list);
 	for (new i = 0; i < playersCount; ++i) {
 		new information[1701];
@@ -149,6 +140,15 @@ public del(id, level, cid) {
 	return PLUGIN_HANDLED;
 }
 
+getPlayerStatusIndex(status[32][3], playersCount, playerId) {
+	for (new i = 0; i < playersCount; ++i) {
+		if (status[i][0] == playerId) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 getRankIndex(points) {
 	for (new i = 0; i < sizeof(rankPoints); ++i) {
 		if (points >= rankPoints[i]) {
@@ -171,10 +171,36 @@ getNextPointsText(points) {
 	new index = getRankIndex(points), text[64];
 	if (index > 0) {
 		format(text, 63, "%d/%d", points, rankPoints[index - 1]);
-	} else {
+		} else {
 		format(text, 63, "%d", points);
 	}
 	return text;
+}
+
+genStatus(status[32][3]) {
+	new players[32], playersCount, playerName[64];
+	new points, tbCount = MAX_TB, mbCount = MAX_MB, brCount = MAX_BR;
+	get_players(players, playersCount);
+	for (new i = 0; i < playersCount; ++i) {
+		status[i][0] = players[i];
+		get_user_name(players[i], playerName, 63);
+		points = nvault_get(vault, playerName);
+		status[i][1] = points;
+		status[i][2] = getRankIndex(points);
+	}
+	SortCustom2D(status, playersCount, "sorter");
+	for (new i = 0; i < playersCount; ++i) {
+		if (status[i][2] == 0 && tbCount-- <= 0) {
+			status[i][2] = 1;
+		}
+		if (status[i][2] == 1 && mbCount-- <= 0) {
+			status[i][2] = 2;
+		}
+		if (status[i][2] == 2 && brCount-- <= 0) {
+			status[i][2] = 3;
+		}
+	}
+	return playersCount;
 }
 
 genRank(status[32][3], playersCount, message[1501]) {
@@ -187,4 +213,19 @@ genRank(status[32][3], playersCount, message[1501]) {
 		strcat(message, append, 1500);
 	}
 	return message;
+}
+
+poisonEffect(playerId) {
+	new Float:fOrigin[3];
+	pev(playerId, pev_origin, fOrigin);
+	fOrigin[2] += 35.0;
+	message_begin(MSG_BROADCAST, SVC_TEMPENTITY);
+	write_byte(TE_SPRITE);
+	write_coord_f(fOrigin[0]);
+	write_coord_f(fOrigin[1]);
+	write_coord_f(fOrigin[2]);
+	write_short(poisonSprite);
+	write_byte(10);
+	write_byte(255);
+	message_end();
 }
